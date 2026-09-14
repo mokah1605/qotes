@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { QUOTE_CATEGORIES, clientKey, error, isRateLimited, readJson } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   const { searchParams } = new URL(req.url);
-  const category = searchParams.get("category");
-  const search = searchParams.get("search");
-  const page = parseInt(searchParams.get("page") ?? "1");
+  const category = searchParams.get("category")?.trim() || null;
+  const search = searchParams.get("search")?.trim() || null;
+  const pageValue = searchParams.get("page") ?? "1";
+  if (!/^[1-9]\d{0,4}$/.test(pageValue)) return error("Page must be a positive integer", 400);
+  if (category && category !== "All" && !QUOTE_CATEGORIES.has(category)) return error("Unknown category", 400);
+  if (search && search.length > 100) return error("Search must be 100 characters or fewer", 400);
+  const page = Number(pageValue);
   const limit = 12;
 
   const where = {
@@ -60,20 +65,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { content, author, category } = await req.json();
+  if (isRateLimited(clientKey(req, session.user.id), 10, 60 * 60 * 1000)) {
+    return error("Too many quote submissions. Try again later.", 429);
+  }
 
-  if (!content?.trim() || !author?.trim()) {
+  const body = await readJson(req);
+  if (!body) return error("A JSON object is required", 400);
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const author = typeof body.author === "string" ? body.author.trim() : "";
+  const category = typeof body.category === "string" ? body.category.trim() : "General";
+
+  if (!content || !author) {
     return NextResponse.json(
       { error: "Content and author are required" },
       { status: 400 }
     );
   }
+  if (content.length > 1_000 || author.length > 120) return error("Quote or author is too long", 400);
+  if (!QUOTE_CATEGORIES.has(category)) return error("Unknown category", 400);
 
   const quote = await prisma.quote.create({
     data: {
-      content: content.trim(),
-      author: author.trim(),
-      category: category ?? "General",
+      content,
+      author,
+      category,
       userId: session.user.id,
     },
   });

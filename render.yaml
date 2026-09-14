@@ -15,7 +15,7 @@ services:
     healthCheckPath: /api/quotes
     envVars:
       - key: NODE_VERSION
-        value: 20.19.0
+        value: 22.0.0
       # --- Database (Turso) — copy from your current Vercel env ---
       - key: TURSO_DATABASE_URL
         sync: false
