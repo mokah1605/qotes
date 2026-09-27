@@ -59,6 +59,7 @@ model Quote {
   content   String
   author    String
   category  String   @default("General")
+  language  String   @default("en")
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   likes     Like[]

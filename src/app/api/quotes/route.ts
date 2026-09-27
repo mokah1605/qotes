@@ -8,15 +8,18 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category")?.trim() || null;
   const search = searchParams.get("search")?.trim() || null;
+  const language = searchParams.get("language")?.trim() || null;
   const pageValue = searchParams.get("page") ?? "1";
   if (!/^[1-9]\d{0,4}$/.test(pageValue)) return error("Page must be a positive integer", 400);
   if (category && category !== "All" && !QUOTE_CATEGORIES.has(category)) return error("Unknown category", 400);
+  if (language && language !== "en" && language !== "ta") return error("Unknown language", 400);
   if (search && search.length > 100) return error("Search must be 100 characters or fewer", 400);
   const page = Number(pageValue);
   const limit = 12;
 
   const where = {
     ...(category && category !== "All" ? { category } : {}),
+    ...(language ? { language } : {}),
     ...(search
       ? {
           OR: [
